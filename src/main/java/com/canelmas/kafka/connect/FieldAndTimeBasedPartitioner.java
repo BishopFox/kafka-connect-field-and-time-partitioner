@@ -72,7 +72,7 @@ public final class FieldAndTimeBasedPartitioner<T> extends TimeBasedPartitioner<
     final String partitionsForFields = this.partitionFieldExtractor.extract(sinkRecord);
     final String partition = String.join(this.delim, partitionsForFields, partitionsForTimestamp);
 
-    log.info("Encoded partition : {}", partition);
+    log.debug("Encoded partition : {}", partition);
 
     return partition;
   }
@@ -82,7 +82,7 @@ public final class FieldAndTimeBasedPartitioner<T> extends TimeBasedPartitioner<
     final String partitionsForFields = this.partitionFieldExtractor.extract(sinkRecord);
     final String partition = String.join(this.delim, partitionsForFields, partitionsForTimestamp);
 
-    log.info("Encoded partition : {}", partition);
+    log.debug("Encoded partition : {}", partition);
 
     return partition;
   }
@@ -107,7 +107,7 @@ public final class FieldAndTimeBasedPartitioner<T> extends TimeBasedPartitioner<
       final Object value = record.value();
       final StringBuilder builder = new StringBuilder();
 
-      log.info("Partitions to rename: {}", partitionsOtherNames);
+      log.debug("Partitions to rename: {}", partitionsOtherNames);
       for (final String fieldName : this.fieldNames) {
         if (builder.length() != 0) {
           builder.append(StorageCommonConfig.DIRECTORY_DELIM_DEFAULT);
