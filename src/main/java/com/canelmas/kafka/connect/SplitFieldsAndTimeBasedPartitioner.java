@@ -22,6 +22,7 @@ import io.confluent.connect.storage.partitioner.PartitionerConfig;
 import io.confluent.connect.storage.partitioner.TimeBasedPartitioner;
 import io.confluent.connect.storage.util.DataUtils;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -34,11 +35,9 @@ import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class FieldAndTimeBasedPartitionerV2<T> extends TimeBasedPartitioner<T> {
+public class SplitFieldsAndTimeBasedPartitioner<T> extends TimeBasedPartitioner<T> {
 
   public static final String PARTITION_FIELD_FORMAT_PATH_CONFIG = "partition.field.format.path";
-  public static final String PARTITION_FIELD_FORMAT_FIELD_FIRST_CONFIG = "partition.field.format.fieldfirst";
-  public static final String PARTITION_FIELD_FORMAT_LOWERCASE_CONFIG = "partition.field.format.lowercase";
   public static final String PARTITION_FIELD_RENAME = "partition.field.rename";
   public static final String PARTITION_FIELD_FORMAT_PATH_DOC =
       "Whether directory labels should be included when partitioning for custom fields e.g. " +
@@ -47,9 +46,7 @@ public class FieldAndTimeBasedPartitionerV2<T> extends TimeBasedPartitioner<T> {
   public static final String PARTITION_FIELD_FORMAT_PATH_DEFAULT = "true";
   public static final String PARTITION_FIELD_FORMAT_LOWERCASE_DEFAULT = "true";
   public static final String PARTITION_FIELD_FORMAT_FIELD_FIRST_DEFAULT = "false";
-  private static final Logger log = LoggerFactory.getLogger(FieldAndTimeBasedPartitionerV2.class);
-  private boolean formatFieldFirst; 
-  private boolean formatLowercase;
+  private static final Logger log = LoggerFactory.getLogger(SplitFieldsAndTimeBasedPartitioner.class);
   private PartitionFieldExtractor partitionFieldExtractor;
 
   protected void init(long partitionDurationMs, String pathFormat, Locale locale,
@@ -59,8 +56,6 @@ public class FieldAndTimeBasedPartitionerV2<T> extends TimeBasedPartitioner<T> {
     final List<String> fieldNames =
         (List<String>) config.get(PartitionerConfig.PARTITION_FIELD_NAME_CONFIG);
     final boolean formatPath = Boolean.parseBoolean((String) config.getOrDefault(PARTITION_FIELD_FORMAT_PATH_CONFIG, PARTITION_FIELD_FORMAT_PATH_DEFAULT));
-    formatFieldFirst = Boolean.parseBoolean((String) config.getOrDefault(PARTITION_FIELD_FORMAT_FIELD_FIRST_CONFIG, PARTITION_FIELD_FORMAT_FIELD_FIRST_DEFAULT));
-    formatLowercase = Boolean.parseBoolean((String) config.getOrDefault(PARTITION_FIELD_FORMAT_LOWERCASE_CONFIG, PARTITION_FIELD_FORMAT_LOWERCASE_DEFAULT));
     String partitionsToRename = (String) config.getOrDefault(PARTITION_FIELD_RENAME, "");
 
     log.info("Partitions fields to rename: {}", partitionsToRename);
@@ -74,16 +69,44 @@ public class FieldAndTimeBasedPartitionerV2<T> extends TimeBasedPartitioner<T> {
         new PartitionFieldExtractor(fieldNames, formatPath, partitionsToRenameMap);
   }
 
+  private String formPartition(final String partitionsForFields, final String partitionsForTimestamp) {
+    String DELIMITER_EQ = "=";
+    String fieldTopicPartition = "topic";
+    String[] fieldPartitions = {"version", "type"};
+        
+    String partitionForFieldsTopic = "";
+    ArrayList<String> partitionsForFieldsParts1 = new ArrayList<String>();
+    ArrayList<String> partitionsForFieldsParts2 = new ArrayList<String>();
+        
+        
+    if (partitionsForFields != null && partitionsForFields.trim().length() != 0) {
+      for (String partition: partitionsForFields.split(this.delim)) {
+        String partitionKey = partition.split(DELIMITER_EQ)[0].toLowerCase().trim();
+        if (fieldTopicPartition.equals(partitionKey)) {
+          partitionForFieldsTopic = partition;
+        }
+        else if (Arrays.asList(fieldPartitions).contains(partitionKey)) {
+          partitionsForFieldsParts1.add(partition);
+        }
+        else {
+          partitionsForFieldsParts2.add(partition);
+        }
+      }
+    }
+        
+    return String.join(this.delim, partitionForFieldsTopic, String.join(this.delim, partitionsForFieldsParts1), partitionsForTimestamp, String.join(this.delim, partitionsForFieldsParts2)).toLowerCase();
+  }  
+
+  @Override
+  public String generatePartitionedPath(String topic, String encodedPartition) {
+    // we don't want to use topic name so we ignore it
+    return encodedPartition;
+  }
+
   public String encodePartition(final SinkRecord sinkRecord, final long nowInMillis) {
     final String partitionsForTimestamp = super.encodePartition(sinkRecord, nowInMillis);
     final String partitionsForFields = this.partitionFieldExtractor.extract(sinkRecord);
-    String partition = formatFieldFirst
-                       ? String.join(this.delim, partitionsForFields, partitionsForTimestamp)
-                       : String.join(this.delim, partitionsForTimestamp, partitionsForFields);
-
-    if (formatLowercase) {
-        partition = partition.toLowerCase();
-    }
+    String partition = formPartition(partitionsForFields, partitionsForTimestamp);
 
     log.debug("Encoded partition : {}", partition);
 
@@ -93,13 +116,7 @@ public class FieldAndTimeBasedPartitionerV2<T> extends TimeBasedPartitioner<T> {
   public String encodePartition(final SinkRecord sinkRecord) {
     final String partitionsForTimestamp = super.encodePartition(sinkRecord);
     final String partitionsForFields = this.partitionFieldExtractor.extract(sinkRecord);
-    String partition = formatFieldFirst
-                       ? String.join(this.delim, partitionsForFields, partitionsForTimestamp)
-                       : String.join(this.delim, partitionsForTimestamp, partitionsForFields);
-
-    if (formatLowercase) {
-        partition = partition.toLowerCase();
-    }
+    String partition = formPartition(partitionsForFields, partitionsForTimestamp);
 
     log.debug("Encoded partition : {}", partition);
 
