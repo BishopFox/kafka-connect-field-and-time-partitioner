@@ -37,19 +37,19 @@ import org.slf4j.LoggerFactory;
 public class FieldAndTimeBasedPartitionerV2<T> extends TimeBasedPartitioner<T> {
 
   public static final String PARTITION_FIELD_FORMAT_PATH_CONFIG = "partition.field.format.path";
-  public static final String PARTITION_FIELD_FORMAT_FIELD_FIRST = "partition.field.format.fieldfirst";
-  public static final String PARTITION_FIELD_FORMAT_LOWERCASE = "partition.field.format.lowercase";
+  public static final String PARTITION_FIELD_FORMAT_FIELD_FIRST_CONFIG = "partition.field.format.fieldfirst";
+  public static final String PARTITION_FIELD_FORMAT_LOWERCASE_CONFIG = "partition.field.format.lowercase";
   public static final String PARTITION_FIELD_RENAME = "partition.field.rename";
   public static final String PARTITION_FIELD_FORMAT_PATH_DOC =
       "Whether directory labels should be included when partitioning for custom fields e.g. " +
           "whether this 'orgId=XXXX/appId=ZZZZ/customField=YYYY' or this 'XXXX/ZZZZ/YYYY'.";
   public static final String PARTITION_FIELD_FORMAT_PATH_DISPLAY = "Partition Field Format Path";
-  public static final boolean PARTITION_FIELD_FORMAT_PATH_DEFAULT = true;
-  public static final boolean PARTITION_FIELD_FORMAT_LOWERCASE_DEFAULT = true;
-  public static final boolean PARTITION_FIELD_FORMAT_FIELD_FIRST_DEFAULT = true;
+  public static final String PARTITION_FIELD_FORMAT_PATH_DEFAULT = "true";
+  public static final String PARTITION_FIELD_FORMAT_LOWERCASE_DEFAULT = "true";
+  public static final String PARTITION_FIELD_FORMAT_FIELD_FIRST_DEFAULT = "false";
   private static final Logger log = LoggerFactory.getLogger(FieldAndTimeBasedPartitionerV2.class);
-  private static boolean formatFieldFirst; 
-  private static boolean formatLowercase;
+  private boolean formatFieldFirst; 
+  private boolean formatLowercase;
   private PartitionFieldExtractor partitionFieldExtractor;
 
   protected void init(long partitionDurationMs, String pathFormat, Locale locale,
@@ -58,12 +58,9 @@ public class FieldAndTimeBasedPartitionerV2<T> extends TimeBasedPartitioner<T> {
 
     final List<String> fieldNames =
         (List<String>) config.get(PartitionerConfig.PARTITION_FIELD_NAME_CONFIG);
-    final boolean formatPath = (Boolean) config
-        .getOrDefault(PARTITION_FIELD_FORMAT_PATH_CONFIG, PARTITION_FIELD_FORMAT_PATH_DEFAULT);
-    formatFieldFirst = (Boolean) config
-        .getOrDefault(PARTITION_FIELD_FORMAT_FIELD_FIRST, PARTITION_FIELD_FORMAT_FIELD_FIRST_DEFAULT);
-    formatLowercase = (Boolean) config
-        .getOrDefault(PARTITION_FIELD_FORMAT_LOWERCASE, PARTITION_FIELD_FORMAT_LOWERCASE_DEFAULT);
+    final boolean formatPath = Boolean.parseBoolean((String) config.getOrDefault(PARTITION_FIELD_FORMAT_PATH_CONFIG, PARTITION_FIELD_FORMAT_PATH_DEFAULT));
+    formatFieldFirst = Boolean.parseBoolean((String) config.getOrDefault(PARTITION_FIELD_FORMAT_FIELD_FIRST_CONFIG, PARTITION_FIELD_FORMAT_FIELD_FIRST_DEFAULT));
+    formatLowercase = Boolean.parseBoolean((String) config.getOrDefault(PARTITION_FIELD_FORMAT_LOWERCASE_CONFIG, PARTITION_FIELD_FORMAT_LOWERCASE_DEFAULT));
     String partitionsToRename = (String) config.getOrDefault(PARTITION_FIELD_RENAME, "");
 
     log.info("Partitions fields to rename: {}", partitionsToRename);
