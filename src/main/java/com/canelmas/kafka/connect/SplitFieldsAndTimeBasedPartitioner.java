@@ -38,8 +38,8 @@ import org.slf4j.LoggerFactory;
 public class SplitFieldsAndTimeBasedPartitioner<T> extends TimeBasedPartitioner<T> {
 
   public static final String PARTITION_FIELD_FORMAT_PATH_CONFIG = "partition.field.format.path";
+  public static final String PARTITION_FIELD_FIRST_SPLIT_FIELDS_CONFIG = "partition.field.first.split.fields";
   public static final String PARTITION_FIELD_RENAME = "partition.field.rename";
-  public static final String PARTITION_FIELD_FIRST_SPLIT_FIELDS = "partition.field.first.split.fields";
   public static final String PARTITION_FIELD_FORMAT_PATH_DOC =
       "Whether directory labels should be included when partitioning for custom fields e.g. " +
           "whether this 'orgId=XXXX/appId=ZZZZ/customField=YYYY' or this 'XXXX/ZZZZ/YYYY'.";
@@ -57,8 +57,7 @@ public class SplitFieldsAndTimeBasedPartitioner<T> extends TimeBasedPartitioner<
 
     final List<String> fieldNames =
         (List<String>) config.get(PartitionerConfig.PARTITION_FIELD_NAME_CONFIG);
-    this.firstSplitFields =
-        (List<String>) config.get(PARTITION_FIELD_FIRST_SPLIT_FIELDS);
+    this.firstSplitFields = convertToList(config.get(PARTITION_FIELD_FIRST_SPLIT_FIELDS_CONFIG));
     final boolean formatPath = Boolean.parseBoolean((String) config.getOrDefault(PARTITION_FIELD_FORMAT_PATH_CONFIG, PARTITION_FIELD_FORMAT_PATH_DEFAULT));
     String partitionsToRename = (String) config.getOrDefault(PARTITION_FIELD_RENAME, "");
 
@@ -75,11 +74,10 @@ public class SplitFieldsAndTimeBasedPartitioner<T> extends TimeBasedPartitioner<
 
   private String formPartition(final String partitionsForFields, final String partitionsForTimestamp) {
     String DELIMITER_EQ = "=";
-    String fieldTopicPartition = "topic";
     String[] fieldPartitions = (this.firstSplitFields == null || this.firstSplitFields.size() == 0)
-                               ? new String[] {"version", "type"}
+                               ? new String[] {"topic", "version", "type"}
                                : this.firstSplitFields.toArray(new String[0]);
-    Arrays.parallelSetAll(fieldPartitions, (i) -> fieldPartitions[i].trim());
+    Arrays.parallelSetAll(fieldPartitions, (i) -> fieldPartitions[i].trim().toLowerCase());
         
     String partitionForFieldsTopic = "";
     ArrayList<String> partitionsForFieldsParts1 = new ArrayList<String>();
@@ -89,10 +87,7 @@ public class SplitFieldsAndTimeBasedPartitioner<T> extends TimeBasedPartitioner<
     if (partitionsForFields != null && partitionsForFields.trim().length() != 0) {
       for (String partition: partitionsForFields.split(this.delim)) {
         String partitionKey = partition.split(DELIMITER_EQ)[0].toLowerCase().trim();
-        if (fieldTopicPartition.equals(partitionKey)) {
-          partitionForFieldsTopic = partition;
-        }
-        else if (Arrays.asList(fieldPartitions).contains(partitionKey)) {
+        if (Arrays.asList(fieldPartitions).contains(partitionKey)) {
           partitionsForFieldsParts1.add(partition);
         }
         else {
@@ -101,8 +96,16 @@ public class SplitFieldsAndTimeBasedPartitioner<T> extends TimeBasedPartitioner<
       }
     }
         
-    return String.join(this.delim, partitionForFieldsTopic, String.join(this.delim, partitionsForFieldsParts1), partitionsForTimestamp, String.join(this.delim, partitionsForFieldsParts2)).toLowerCase();
+    return String.join(this.delim, String.join(this.delim, partitionsForFieldsParts1), partitionsForTimestamp, String.join(this.delim, partitionsForFieldsParts2)).toLowerCase();
   }  
+
+  private List<String> convertToList(Object value) {
+    if (value == null) {
+      return new ArrayList<>();
+    }
+
+    return Arrays.asList(value.toString().split(","));
+  }
 
   @Override
   public String generatePartitionedPath(String topic, String encodedPartition) {
