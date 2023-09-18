@@ -39,6 +39,7 @@ public class SplitFieldsAndTimeBasedPartitioner<T> extends TimeBasedPartitioner<
 
   public static final String PARTITION_FIELD_FORMAT_PATH_CONFIG = "partition.field.format.path";
   public static final String PARTITION_FIELD_RENAME = "partition.field.rename";
+  public static final String PARTITION_FIELD_FIRST_SPLIT_FIELDS = "partition.field.first.split.fields";
   public static final String PARTITION_FIELD_FORMAT_PATH_DOC =
       "Whether directory labels should be included when partitioning for custom fields e.g. " +
           "whether this 'orgId=XXXX/appId=ZZZZ/customField=YYYY' or this 'XXXX/ZZZZ/YYYY'.";
@@ -48,6 +49,7 @@ public class SplitFieldsAndTimeBasedPartitioner<T> extends TimeBasedPartitioner<
   public static final String PARTITION_FIELD_FORMAT_FIELD_FIRST_DEFAULT = "false";
   private static final Logger log = LoggerFactory.getLogger(SplitFieldsAndTimeBasedPartitioner.class);
   private PartitionFieldExtractor partitionFieldExtractor;
+  private List<String> firstSplitFields = new ArrayList<>();
 
   protected void init(long partitionDurationMs, String pathFormat, Locale locale,
                       DateTimeZone timeZone, Map<String, Object> config) {
@@ -55,6 +57,8 @@ public class SplitFieldsAndTimeBasedPartitioner<T> extends TimeBasedPartitioner<
 
     final List<String> fieldNames =
         (List<String>) config.get(PartitionerConfig.PARTITION_FIELD_NAME_CONFIG);
+    this.firstSplitFields =
+        (List<String>) config.get(PARTITION_FIELD_FIRST_SPLIT_FIELDS);
     final boolean formatPath = Boolean.parseBoolean((String) config.getOrDefault(PARTITION_FIELD_FORMAT_PATH_CONFIG, PARTITION_FIELD_FORMAT_PATH_DEFAULT));
     String partitionsToRename = (String) config.getOrDefault(PARTITION_FIELD_RENAME, "");
 
@@ -72,7 +76,10 @@ public class SplitFieldsAndTimeBasedPartitioner<T> extends TimeBasedPartitioner<
   private String formPartition(final String partitionsForFields, final String partitionsForTimestamp) {
     String DELIMITER_EQ = "=";
     String fieldTopicPartition = "topic";
-    String[] fieldPartitions = {"version", "type"};
+    String[] fieldPartitions = (this.firstSplitFields == null || this.firstSplitFields.size() == 0)
+                               ? new String[] {"version", "type"}
+                               : this.firstSplitFields.toArray(new String[0]);
+    Arrays.parallelSetAll(fieldPartitions, (i) -> fieldPartitions[i].trim());
         
     String partitionForFieldsTopic = "";
     ArrayList<String> partitionsForFieldsParts1 = new ArrayList<String>();
